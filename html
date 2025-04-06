@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Survival Game - Combined Crafting & Tools</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #001f3f; /* Dark Navy - acts as water */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: sans-serif; /* Base font */
+        }
+        #gameContainer {
+            position: relative; /* Needed for positioning UI elements */
+        }
+        canvas {
+            border: 1px solid black;
+            background-color: transparent; /* Make canvas see-through to body background */
+            display: block; /* Prevent extra space below canvas */
+         }
+        #ui {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            color: white;
+            background-color: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 10; /* Ensure UI is above canvas */
+            text-shadow: 1px 1px 2px black; /* Improve readability */
+            font-family: sans-serif;
+        }
+        #hotbar { /* This is the MAIN game hotbar */
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 5px;
+            background-color: rgba(0, 0, 0, 0.4);
+            padding: 5px;
+            border-radius: 3px;
+             z-index: 10;
+        }
+        .hotbar-slot { /* Style for MAIN game hotbar slots */
+            width: 50px;
+            height: 50px;
+            border: 2px solid gray;
+            background-color: rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.2em; /* Make number bigger */
+            color: rgba(255, 255, 255, 0.7);
+            font-family: sans-serif;
+            position: relative; /* For item count and icon */
+            box-sizing: border-box;
+        }
+        .hotbar-slot.selected {
+            border-color: white;
+            background-color: rgba(255, 255, 255, 0.4);
+        }
+        /* Item icon and count within the MAIN hotbar */
+        .hotbar-slot .item-icon {
+             width: 35px;
+             height: 35px;
+             border: 1px solid rgba(0,0,0,0.3);
+             border-radius: 3px;
+             position: absolute; /* Position icon over number */
+             top: 50%;
+             left: 50%;
+             transform: translate(-50%, -50%);
+             pointer-events: none; /* Allow clicks to pass through icon */
+        }
+        .hotbar-slot .item-count {
+             position: absolute;
+             bottom: 2px;
+             right: 4px;
+             font-size: 0.8em;
+             font-weight: bold;
+             text-shadow: 1px 1px 2px black;
+             color: white; /* Ensure count is visible */
+             z-index: 1; /* Above icon */
+             pointer-events: none;
+        }
+
+        #debug {
+            position: absolute;
+            bottom: 75px; /* Position above hotbar */
+            left: 10px;
+            color: white;
+            font-family: monospace;
+            z-index: 10;
+            background-color: rgba(0,0,0,0.5);
+            padding: 5px;
+            border-radius: 3px;
+            font-size: 0.8em;
+        }
+         #deathMessage {
+             position: absolute;
+             top: 50%;
+             left: 50%;
+             transform: translate(-50%, -50%);
+             color: red;
+             background-color: rgba(0,0,0,0.8);
+             padding: 20px;
+             border: 2px solid darkred;
+             font-size: 2em;
+             font-weight: bold;
+             text-align: center;
+             z-index: 20;
+             display: none; /* Hidden by default */
+             font-family: sans-serif;
+         }
+         #deathMessage small {
+            font-size: 0.5em;
+            font-weight: normal;
+            color: #ccc;
+         }
+
+         #nightOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000033; /* Dark blueish */
+            opacity: 0; /* Start transparent */
+            transition: opacity 1.5s ease-in-out; /* Smooth transition */
+            pointer-events: none; /* Don't block mouse interaction */
+            z-index: 5; /* Above canvas, below UI elements */
+        }
+         #nightOverlay.active {
+            opacity: 0.7; /* Adjust darkness as needed */
+         }
+
+
+        /* --- Combined Crafting Menu Styles --- */
+        #craftingMenu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            /* Start with single column width */
+            width: 600px;
+            max-width: 95%; /* Allow shrinking */
+            max-height: 85vh;
+            background-color: rgba(50, 50, 70, 0.95);
+            border: 3px solid #a0a0a0;
+            border-radius: 10px;
+            color: white;
+            padding: 15px; /* Slightly reduce padding */
+            z-index: 50; /* High z-index */
+            display: none; /* Hidden by default */
+            font-family: sans-serif;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            overflow: hidden; /* Prevent direct scrolling on main div */
+            box-sizing: border-box;
+            /* Flex properties set by JS class */
+            transition: width 0.3s ease-in-out; /* Smooth width change */
+        }
+
+        /* Style for when workbench is active */
+        #craftingMenu.workbench-active {
+            display: flex; /* Enable flex for side-by-side */
+            flex-direction: row;
+            gap: 15px;
+            width: 85%; /* Wider when workbench active */
+            max-width: 1100px; /* Max wider width */
+        }
+
+        .crafting-column {
+            background-color: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto; /* Allow scrolling within columns */
+            box-sizing: border-box;
+        }
+
+        #playerCraftingColumn {
+            flex-basis: 550px; /* Give player side a fixed base width */
+            flex-shrink: 0; /* Don't shrink player column */
+             /* Width adjusts automatically when single column */
+        }
+        #workbenchRecipeSection {
+            flex: 1; /* Let workbench recipes take remaining space */
+            display: none; /* Hidden by default */
+        }
+        /* Show workbench section when active */
+        #craftingMenu.workbench-active #workbenchRecipeSection {
+            display: flex; /* Use flex to allow internal scrolling */
+            flex-direction: column; /* Stack title and list */
+        }
+
+
+        #craftingMenu h2, #craftingMenu h3 {
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #e0e0e0;
+            flex-shrink: 0;
+        }
+
+        /* Inventory Grid Area ('E' Menu) */
+        #inventoryDisplay { background: none; padding: 0; margin-bottom: 10px; }
+         #inventoryGrid {
+             display: grid;
+             gap: 5px;
+             grid-template-columns: repeat(var(--inventory-cols, 8), 50px);
+             justify-content: center;
+             margin-bottom: 10px;
+             flex-shrink: 0; /* Prevent grid shrinking too much */
+        }
+         /* Hotbar representation inside 'E' menu */
+        #hotbarDisplay { background: none; padding: 0; margin-bottom: 10px; }
+        #hotbarGrid {
+             display: grid;
+             gap: 5px;
+             grid-template-columns: repeat(var(--hotbar-size, 5), 50px);
+             justify-content: center;
+             margin-bottom: 10px;
+             flex-shrink: 0;
+         }
+
+        /* Shared slot style for Inventory & Hotbar in 'E' Menu */
+        .inventory-slot, .hotbar-menu-slot {
+            width: 50px; height: 50px; border: 2px solid gray; background-color: rgba(255, 255, 255, 0.1);
+            position: relative; cursor: pointer; overflow: hidden; display: flex; justify-content: center; align-items: center; box-sizing: border-box;
+        }
+        .inventory-slot:hover, .hotbar-menu-slot:hover { border-color: #ddd; background-color: rgba(255, 255, 255, 0.15); }
+        .inventory-slot.selected-for-move, .hotbar-menu-slot.selected-for-move { border-color: yellow; box-shadow: 0 0 5px yellow; }
+
+        /* Style for item icon/count inside slots (Shared) */
+        .item-icon { width: 35px; height: 35px; border: 1px solid rgba(0,0,0,0.3); border-radius: 3px; pointer-events: none; }
+        .item-count { position: absolute; bottom: 2px; right: 4px; color: white; font-size: 0.8em; font-weight: bold; text-shadow: 1px 1px 2px black; pointer-events: none; }
+
+         /* Recipe Area ('E' Menu & Workbench) */
+        #recipeSection, #workbenchRecipeSection { /* Apply shared recipe area styles */
+            background: none; padding: 0;
+            flex-grow: 1; /* Allow recipe lists to grow */
+            display: flex; /* Needed for flex-grow */
+            flex-direction: column;
+            min-height: 150px; /* Ensure recipe area has some minimum height */
+        }
+         #recipeList, #workbenchRecipeList {
+             list-style: none; padding: 0; margin: 0;
+             overflow-y: auto; /* Scroll within the list */
+             flex-grow: 1;
+             background-color: rgba(0,0,0,0.15); /* Background for list area */
+             border-radius: 3px;
+             padding: 5px;
+         }
+        /* Shared recipe item styles */
+        #recipeList li, #workbenchRecipeList li {
+            background-color: rgba(255, 255, 255, 0.08); padding: 8px 12px; margin-bottom: 5px; border-radius: 4px;
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+        }
+         /* Shared button styles */
+        #recipeList li button, #workbenchRecipeList li button {
+            padding: 5px 10px; cursor: pointer; background-color: #4CAF50; border: none; color: white; border-radius: 3px; margin-left: auto; flex-shrink: 0;
+        }
+        #recipeList li button:disabled, #workbenchRecipeList li button:disabled { background-color: #a0a0a0; cursor: not-allowed; }
+         /* Shared details/ingredients styles */
+        .recipe-details { font-size: 0.9em; color: #c0c0c0; width: 100%; margin-top: 4px; }
+        .ingredient { margin-right: 8px; white-space: nowrap; }
+        .ingredient.missing { color: #ff8080; }
+
+        /* Close Button Styling */
+        #closeCraftingButton {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+             padding: 5px 8px; background-color: #f44336; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 0.9em; z-index: 55;
+        }
+    </style>
+</head>
+<body>
+    <!-- Game Area -->
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div id="nightOverlay"></div> <!-- Night Overlay Div -->
+        <div id="ui">
+            <div>Day: <span id="dayValue">1</span></div>
+            <div>Health: <span id="healthValue">100</span> / 100</div>
+            <div>Hunger: <span id="hungerValue">100</span> / 100</div>
+        </div>
+        <!-- Main Game Hotbar -->
+        <div id="hotbar">
+            <div class="hotbar-slot" id="hotbar-slot-0">1</div> <!-- Use index in ID -->
+            <div class="hotbar-slot" id="hotbar-slot-1">2</div>
+            <div class="hotbar-slot" id="hotbar-slot-2">3</div>
+            <div class="hotbar-slot" id="hotbar-slot-3">4</div>
+            <div class="hotbar-slot" id="hotbar-slot-4">5</div>
+        </div>
+        <div id="debug">World: (0, 0) | Mouse: (0, 0) | Res: 0 | Mon: 0 | Items: 0</div>
+         <div id="deathMessage">YOU DIED<br><small>(Refresh to restart)</small></div>
+    </div> <!-- End of gameContainer -->
+
+    <!-- Combined Crafting Menu ('E' Key) -->
+    <div id="craftingMenu">
+        <!-- Column for Player Inventory & Crafting -->
+        <div class="crafting-column" id="playerCraftingColumn">
+            <h2 id="craftingMenuTitle">Crafting</h2> <!-- Title might change based on context -->
+            <div id="inventoryDisplay">
+                <h3>Inventory</h3>
+                <div id="inventoryGrid">
+                    <!-- Inventory slots for 'E' menu generated here by JS -->
+                </div>
+            </div>
+            <div id="hotbarDisplay">
+                <h3>Hotbar</h3>
+                 <div id="hotbarGrid">
+                    <!-- Hotbar slots for 'E' menu generated here by JS -->
+                </div>
+            </div>
+            <div id="recipeSection">
+                 <h3>Player Recipes</h3> <!-- Changed title -->
+                <ul id="recipeList">
+                    <!-- Player recipes for 'E' menu listed here by JS -->
+                    <li>Loading recipes...</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Column for Workbench Recipes (Conditionally Shown) -->
+        <div class="crafting-column" id="workbenchRecipeSection">
+            <h3>Workbench Recipes</h3>
+            <ul id="workbenchRecipeList">
+                <!-- Workbench recipes generated here by JS -->
+            </ul>
+        </div>
+
+        <button id="closeCraftingButton">Close [E/ESC]</button> <!-- Updated text -->
+    </div>
+
+
+    <!-- Load Game Script -->
+    <script src="game.js"></script>
+</body>
+</html>
