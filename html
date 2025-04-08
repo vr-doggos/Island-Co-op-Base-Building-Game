@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Survival Game - Combined Crafting & Tools</title>
+    <title>Simple Survival Game - Integrated Upgrader</title>
     <style>
         body {
             margin: 0;
@@ -123,20 +123,14 @@
             color: #ccc;
          }
 
-         #nightOverlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #000033; /* Dark blueish */
-            opacity: 0; /* Start transparent */
-            transition: opacity 1.5s ease-in-out; /* Smooth transition */
-            pointer-events: none; /* Don't block mouse interaction */
-            z-index: 5; /* Above canvas, below UI elements */
-        }
-         #nightOverlay.active {
-            opacity: 0.7; /* Adjust darkness as needed */
+         /* Add styles for Time UI */
+         #timeUI {
+             margin-top: 8px; /* Add space above */
+             color: white;
+             text-shadow: 1px 1px 2px black;
+             font-family: sans-serif;
+             font-size: 0.9em;
+             text-align: right;
          }
 
 
@@ -146,94 +140,70 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            /* Start with single column width */
-            width: 600px;
-            max-width: 95%; /* Allow shrinking */
+            width: 600px; /* Default width */
+            max-width: 95%;
             max-height: 85vh;
             background-color: rgba(50, 50, 70, 0.95);
             border: 3px solid #a0a0a0;
             border-radius: 10px;
             color: white;
-            padding: 15px; /* Slightly reduce padding */
-            z-index: 50; /* High z-index */
+            padding: 15px;
+            z-index: 50;
             display: none; /* Hidden by default */
             font-family: sans-serif;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            overflow: hidden; /* Prevent direct scrolling on main div */
+            overflow: hidden;
             box-sizing: border-box;
-            /* Flex properties set by JS class */
-            transition: width 0.3s ease-in-out; /* Smooth width change */
+            transition: width 0.3s ease-in-out;
+        }
+        /* Apply flex when menu is open (activated by JS) */
+        #craftingMenu.active {
+             display: flex;
+             flex-direction: row;
+             gap: 15px;
+        }
+        /* Style for when workbench or upgrader is active (makes it wider) */
+        #craftingMenu.workbench-active,
+        #craftingMenu.upgrader-active {
+            width: 85%;
+            max-width: 1100px;
         }
 
-        /* Style for when workbench is active */
-        #craftingMenu.workbench-active {
-            display: flex; /* Enable flex for side-by-side */
-            flex-direction: row;
-            gap: 15px;
-            width: 85%; /* Wider when workbench active */
-            max-width: 1100px; /* Max wider width */
+        .crafting-column { /* Shared column style */
+            background-color: rgba(0,0,0,0.2); padding: 10px; border-radius: 5px;
+            display: flex; flex-direction: column; overflow-y: auto; box-sizing: border-box;
         }
+        #playerCraftingColumn { flex-basis: 550px; flex-shrink: 0; }
+        #contextualColumn { flex: 1; display: none; /* Hide context column by default */ }
 
-        .crafting-column {
-            background-color: rgba(0,0,0,0.2);
-            padding: 10px;
-            border-radius: 5px;
+        /* Show context column when active */
+        #craftingMenu.workbench-active #contextualColumn,
+        #craftingMenu.upgrader-active #contextualColumn {
             display: flex;
-            flex-direction: column;
-            overflow-y: auto; /* Allow scrolling within columns */
-            box-sizing: border-box;
         }
 
-        #playerCraftingColumn {
-            flex-basis: 550px; /* Give player side a fixed base width */
-            flex-shrink: 0; /* Don't shrink player column */
-             /* Width adjusts automatically when single column */
+        .context-section { /* Base style for context sections */
+             display: none; /* Hide individual context sections by default */
+             flex-direction: column;
+             height: 100%; /* Make section fill column */
         }
-        #workbenchRecipeSection {
-            flex: 1; /* Let workbench recipes take remaining space */
-            display: none; /* Hidden by default */
-        }
-        /* Show workbench section when active */
-        #craftingMenu.workbench-active #workbenchRecipeSection {
-            display: flex; /* Use flex to allow internal scrolling */
-            flex-direction: column; /* Stack title and list */
-        }
+        /* Show specific context section based on parent class */
+         #craftingMenu.workbench-active #workbenchContext,
+         #craftingMenu.upgrader-active #upgraderContext {
+             display: flex;
+         }
 
 
-        #craftingMenu h2, #craftingMenu h3 {
-            text-align: center;
-            margin-top: 0;
-            margin-bottom: 10px;
-            color: #e0e0e0;
-            flex-shrink: 0;
-        }
+        #craftingMenu h2, #craftingMenu h3 { text-align: center; margin-top: 0; margin-bottom: 10px; color: #e0e0e0; flex-shrink: 0; }
 
         /* Inventory Grid Area ('E' Menu) */
         #inventoryDisplay { background: none; padding: 0; margin-bottom: 10px; }
-         #inventoryGrid {
-             display: grid;
-             gap: 5px;
-             grid-template-columns: repeat(var(--inventory-cols, 8), 50px);
-             justify-content: center;
-             margin-bottom: 10px;
-             flex-shrink: 0; /* Prevent grid shrinking too much */
-        }
-         /* Hotbar representation inside 'E' menu */
-        #hotbarDisplay { background: none; padding: 0; margin-bottom: 10px; }
-        #hotbarGrid {
-             display: grid;
-             gap: 5px;
-             grid-template-columns: repeat(var(--hotbar-size, 5), 50px);
-             justify-content: center;
-             margin-bottom: 10px;
-             flex-shrink: 0;
-         }
+         #inventoryGrid { display: grid; gap: 5px; grid-template-columns: repeat(var(--inventory-cols, 8), 50px); justify-content: center; margin-bottom: 10px; flex-shrink: 0; }
+         #hotbarDisplay { background: none; padding: 0; margin-bottom: 10px; }
+        #hotbarGrid { display: grid; gap: 5px; grid-template-columns: repeat(var(--hotbar-size, 5), 50px); justify-content: center; margin-bottom: 10px; flex-shrink: 0; }
 
         /* Shared slot style for Inventory & Hotbar in 'E' Menu */
-        .inventory-slot, .hotbar-menu-slot {
-            width: 50px; height: 50px; border: 2px solid gray; background-color: rgba(255, 255, 255, 0.1);
-            position: relative; cursor: pointer; overflow: hidden; display: flex; justify-content: center; align-items: center; box-sizing: border-box;
-        }
+        .inventory-slot, .hotbar-menu-slot { width: 50px; height: 50px; border: 2px solid gray; background-color: rgba(255, 255, 255, 0.1); position: relative; cursor: pointer; overflow: hidden; display: flex; justify-content: center; align-items: center; box-sizing: border-box; }
         .inventory-slot:hover, .hotbar-menu-slot:hover { border-color: #ddd; background-color: rgba(255, 255, 255, 0.15); }
         .inventory-slot.selected-for-move, .hotbar-menu-slot.selected-for-move { border-color: yellow; box-shadow: 0 0 5px yellow; }
 
@@ -242,54 +212,49 @@
         .item-count { position: absolute; bottom: 2px; right: 4px; color: white; font-size: 0.8em; font-weight: bold; text-shadow: 1px 1px 2px black; pointer-events: none; }
 
          /* Recipe Area ('E' Menu & Workbench) */
-        #recipeSection, #workbenchRecipeSection { /* Apply shared recipe area styles */
-            background: none; padding: 0;
-            flex-grow: 1; /* Allow recipe lists to grow */
-            display: flex; /* Needed for flex-grow */
-            flex-direction: column;
-            min-height: 150px; /* Ensure recipe area has some minimum height */
-        }
-         #recipeList, #workbenchRecipeList {
-             list-style: none; padding: 0; margin: 0;
-             overflow-y: auto; /* Scroll within the list */
-             flex-grow: 1;
-             background-color: rgba(0,0,0,0.15); /* Background for list area */
-             border-radius: 3px;
-             padding: 5px;
-         }
+        #recipeSection, #workbenchContext { background: none; padding: 0; flex-grow: 1; display: flex; flex-direction: column; min-height: 150px; }
+         #recipeList, #workbenchRecipeList { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; background-color: rgba(0,0,0,0.15); border-radius: 3px; padding: 5px; }
         /* Shared recipe item styles */
-        #recipeList li, #workbenchRecipeList li {
-            background-color: rgba(255, 255, 255, 0.08); padding: 8px 12px; margin-bottom: 5px; border-radius: 4px;
-            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
-        }
+        #recipeList li, #workbenchRecipeList li { background-color: rgba(255, 255, 255, 0.08); padding: 8px 12px; margin-bottom: 5px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
          /* Shared button styles */
-        #recipeList li button, #workbenchRecipeList li button {
-            padding: 5px 10px; cursor: pointer; background-color: #4CAF50; border: none; color: white; border-radius: 3px; margin-left: auto; flex-shrink: 0;
-        }
+        #recipeList li button, #workbenchRecipeList li button { padding: 5px 10px; cursor: pointer; background-color: #4CAF50; border: none; color: white; border-radius: 3px; margin-left: auto; flex-shrink: 0; }
         #recipeList li button:disabled, #workbenchRecipeList li button:disabled { background-color: #a0a0a0; cursor: not-allowed; }
          /* Shared details/ingredients styles */
         .recipe-details { font-size: 0.9em; color: #c0c0c0; width: 100%; margin-top: 4px; }
         .ingredient { margin-right: 8px; white-space: nowrap; }
         .ingredient.missing { color: #ff8080; }
 
+        /* --- Upgrader Specific Styles --- */
+         #upgraderContext h3 { margin-bottom: 20px;}
+         .upgrader-slots { display: flex; justify-content: space-around; align-items: center; margin-bottom: 20px; background-color: rgba(0,0,0,0.2); padding: 15px; border-radius: 5px; }
+         .upgrader-slot-area { text-align: center; font-size: 0.9em; color: #ccc;}
+         .upgrader-slot-area .inventory-slot { margin: 5px auto; cursor: default; border-color: #555; }
+         .upgrader-input-slot { cursor: pointer; border-color: #88f; } /* Make input clickable */
+         .upgrader-input-slot:hover { border-color: #aaf; }
+         .upgrader-input-slot.has-item, .upgrader-material-slot.has-item, .upgrader-output-slot.has-item { opacity: 1; } /* Show items clearly */
+         .upgrader-material-slot .item-icon { width: 25px; height: 25px; }
+         .upgrader-plus, .upgrader-arrow { font-size: 1.5em; margin: 0 10px; }
+         #upgradeItemButton { display: block; width: 120px; padding: 10px; margin: 15px auto; font-size: 1em; cursor: pointer; background-color: #6a4caf; border: none; color: white; border-radius: 5px; }
+         #upgradeItemButton:disabled { background-color: #777; cursor: not-allowed; }
+
+
         /* Close Button Styling */
-        #closeCraftingButton {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-             padding: 5px 8px; background-color: #f44336; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 0.9em; z-index: 55;
-        }
+        #closeCraftingButton { position: absolute; top: 10px; right: 10px; padding: 5px 8px; background-color: #f44336; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 0.9em; z-index: 55; }
     </style>
 </head>
 <body>
     <!-- Game Area -->
     <div id="gameContainer">
         <canvas id="gameCanvas" width="800" height="600"></canvas>
-        <div id="nightOverlay"></div> <!-- Night Overlay Div -->
+        <!-- Removed nightOverlay div -->
         <div id="ui">
             <div>Day: <span id="dayValue">1</span></div>
             <div>Health: <span id="healthValue">100</span> / 100</div>
             <div>Hunger: <span id="hungerValue">100</span> / 100</div>
+            <div id="timeUI"> <!-- ADDED TIME UI ELEMENT -->
+                <span>Phase: Day</span><br>
+                <span>~ Left: 00:00</span>
+            </div>
         </div>
         <!-- Main Game Hotbar -->
         <div id="hotbar">
@@ -307,39 +272,59 @@
     <div id="craftingMenu">
         <!-- Column for Player Inventory & Crafting -->
         <div class="crafting-column" id="playerCraftingColumn">
-            <h2 id="craftingMenuTitle">Crafting</h2> <!-- Title might change based on context -->
+            <h2 id="craftingMenuTitle">Crafting</h2>
             <div id="inventoryDisplay">
                 <h3>Inventory</h3>
-                <div id="inventoryGrid">
-                    <!-- Inventory slots for 'E' menu generated here by JS -->
-                </div>
+                <div id="inventoryGrid"></div>
             </div>
             <div id="hotbarDisplay">
                 <h3>Hotbar</h3>
-                 <div id="hotbarGrid">
-                    <!-- Hotbar slots for 'E' menu generated here by JS -->
-                </div>
+                 <div id="hotbarGrid"></div>
             </div>
             <div id="recipeSection">
-                 <h3>Player Recipes</h3> <!-- Changed title -->
-                <ul id="recipeList">
-                    <!-- Player recipes for 'E' menu listed here by JS -->
-                    <li>Loading recipes...</li>
-                </ul>
+                 <h3>Player Recipes</h3>
+                 <ul id="recipeList"></ul>
             </div>
         </div>
 
-        <!-- Column for Workbench Recipes (Conditionally Shown) -->
-        <div class="crafting-column" id="workbenchRecipeSection">
-            <h3>Workbench Recipes</h3>
-            <ul id="workbenchRecipeList">
-                <!-- Workbench recipes generated here by JS -->
-            </ul>
+        <!-- Contextual Column (Shown/Hidden by JS/CSS) -->
+        <div class="crafting-column" id="contextualColumn">
+             <!-- Workbench Recipes (Shown/Hidden by JS/CSS) -->
+            <div id="workbenchContext" class="context-section">
+                <h3>Workbench Recipes</h3>
+                <ul id="workbenchRecipeList"></ul>
+            </div>
+             <!-- Upgrader UI (Shown/Hidden by JS/CSS) -->
+             <div id="upgraderContext" class="context-section">
+                 <h3>Item Upgrader T1</h3>
+                 <div class="upgrader-slots">
+                     <div class="upgrader-slot-area">
+                         <div>Input Tool</div>
+                         <div class="inventory-slot upgrader-input-slot" id="upgraderInputSlot">
+                             (Place Tool) <!-- Placeholder text -->
+                         </div>
+                     </div>
+                     <div class="upgrader-plus">+</div>
+                     <div class="upgrader-slot-area">
+                         <div>Material</div>
+                         <div class="inventory-slot upgrader-material-slot" id="upgraderMaterialSlot">
+                             <!-- JS will show required material -->
+                         </div>
+                     </div>
+                     <div class="upgrader-arrow">➡️</div>
+                     <div class="upgrader-slot-area">
+                        <div>Output Tool</div>
+                         <div class="inventory-slot upgrader-output-slot" id="upgraderOutputSlot">
+                             <!-- JS will show result -->
+                         </div>
+                     </div>
+                 </div>
+                 <button id="upgradeItemButton" disabled>Upgrade</button>
+             </div>
         </div>
 
-        <button id="closeCraftingButton">Close [E/ESC]</button> <!-- Updated text -->
+        <button id="closeCraftingButton">Close [E/ESC]</button>
     </div>
-
 
     <!-- Load Game Script -->
     <script src="game.js"></script>
