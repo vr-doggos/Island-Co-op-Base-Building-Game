@@ -499,10 +499,7 @@ function handleSpacebarPress() { if (player.className === 'summoner') { trySummo
 classSelect.addEventListener('change', ()=>{startGameButton.disabled=!(classSelect.value&&CLASS_DATA[classSelect.value]);});
 startGameButton.addEventListener('click', ()=>{const selectedClass=classSelect.value; if(!selectedClass||!CLASS_DATA[selectedClass]){alert("Select class!");return;} applyClassStats(selectedClass); classSelectionOverlay.style.display='none'; initializeGame();});
 
-// --- Start Game (Wait for Class Selection) ---
-player.xpToNextLevel = calculateXPForNextLevel(player.level); // Calc initial XP
-requestAnimationFrame(gameLoop); // Start loop, waits for gameHasStarted flag
-console.log("--- game.js loaded. Waiting for class selection... ---");
+
 
 
 // --- Pet Update and Draw ---
