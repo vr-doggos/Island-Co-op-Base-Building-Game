@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Survival Game - Class Selection</title>
+    <title>Simple Survival Game - Class Selection & Perks</title>
     <style>
         body {
             margin: 0;
@@ -14,7 +14,7 @@
             align-items: center;
             height: 100vh;
             font-family: sans-serif; /* Base font */
-            position: relative; /* Needed for overlay */
+            position: relative; /* Needed for overlays */
         }
         #gameContainer {
             position: relative; /* Needed for positioning UI elements */
@@ -92,7 +92,7 @@
 
         #debug {
             position: absolute;
-            bottom: 75px; /* Position above hotbar */
+            bottom: 95px; /* Adjusted position above minion bar */
             left: 10px;
             color: white;
             font-family: monospace;
@@ -124,7 +124,7 @@
             color: #ccc;
          }
 
-         /* Add styles for Time UI */
+         /* Time UI Styles */
          #timeUI {
              margin-top: 8px; /* Add space above */
              color: white;
@@ -133,6 +133,24 @@
              font-size: 0.9em;
              text-align: right;
          }
+
+        /* Style for Minion Info Bar */
+        #minionInfoBar {
+            position: absolute;
+            bottom: 70px; /* Position above hotbar */
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(100, 0, 100, 0.6); /* Purple-ish */
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            text-align: center;
+            z-index: 9; /* Below main UI/hotbar but above canvas */
+            white-space: nowrap; /* Prevent wrapping */
+            display: none; /* Hidden initially */
+        }
+
 
         /* --- Combined Crafting Menu Styles --- */
         #craftingMenu {
@@ -156,139 +174,67 @@
             box-sizing: border-box;
             transition: width 0.3s ease-in-out;
         }
-        /* Apply flex when menu is open (activated by JS) */
-        #craftingMenu.active {
-             display: flex;
-             flex-direction: row;
-             gap: 15px;
-        }
-        /* Style for when workbench or upgrader is active (makes it wider) */
-        #craftingMenu.workbench-active,
-        #craftingMenu.upgrader-active {
-            width: 85%;
-            max-width: 1100px;
-        }
-
-        .crafting-column { /* Shared column style */
-            background-color: rgba(0,0,0,0.2); padding: 10px; border-radius: 5px;
-            display: flex; flex-direction: column; overflow-y: auto; box-sizing: border-box;
-        }
+        #craftingMenu.active { display: flex; flex-direction: row; gap: 15px; }
+        #craftingMenu.workbench-active, #craftingMenu.upgrader-active { width: 85%; max-width: 1100px; }
+        .crafting-column { background-color: rgba(0,0,0,0.2); padding: 10px; border-radius: 5px; display: flex; flex-direction: column; overflow-y: auto; box-sizing: border-box; }
         #playerCraftingColumn { flex-basis: 550px; flex-shrink: 0; }
-        #contextualColumn { flex: 1; display: none; /* Hide context column by default */ }
-
-        /* Show context column when active */
-        #craftingMenu.workbench-active #contextualColumn,
-        #craftingMenu.upgrader-active #contextualColumn {
-            display: flex;
-        }
-
-        .context-section { /* Base style for context sections */
-             display: none; /* Hide individual context sections by default */
-             flex-direction: column;
-             height: 100%; /* Make section fill column */
-        }
-        /* Show specific context section based on parent class */
-         #craftingMenu.workbench-active #workbenchContext,
-         #craftingMenu.upgrader-active #upgraderContext {
-             display: flex;
-         }
-
-
+        #contextualColumn { flex: 1; display: none; }
+        #craftingMenu.workbench-active #contextualColumn, #craftingMenu.upgrader-active #contextualColumn { display: flex; }
+        .context-section { display: none; flex-direction: column; height: 100%; }
+        #craftingMenu.workbench-active #workbenchContext, #craftingMenu.upgrader-active #upgraderContext { display: flex; }
         #craftingMenu h2, #craftingMenu h3 { text-align: center; margin-top: 0; margin-bottom: 10px; color: #e0e0e0; flex-shrink: 0; }
-
-        /* Inventory Grid Area ('E' Menu) */
         #inventoryDisplay { background: none; padding: 0; margin-bottom: 10px; }
-         #inventoryGrid { display: grid; gap: 5px; grid-template-columns: repeat(var(--inventory-cols, 8), 50px); justify-content: center; margin-bottom: 10px; flex-shrink: 0; }
-         #hotbarDisplay { background: none; padding: 0; margin-bottom: 10px; }
+        #inventoryGrid { display: grid; gap: 5px; grid-template-columns: repeat(var(--inventory-cols, 8), 50px); justify-content: center; margin-bottom: 10px; flex-shrink: 0; }
+        #hotbarDisplay { background: none; padding: 0; margin-bottom: 10px; }
         #hotbarGrid { display: grid; gap: 5px; grid-template-columns: repeat(var(--hotbar-size, 5), 50px); justify-content: center; margin-bottom: 10px; flex-shrink: 0; }
-
-        /* Shared slot style for Inventory & Hotbar in 'E' Menu */
         .inventory-slot, .hotbar-menu-slot { width: 50px; height: 50px; border: 2px solid gray; background-color: rgba(255, 255, 255, 0.1); position: relative; cursor: pointer; overflow: hidden; display: flex; justify-content: center; align-items: center; box-sizing: border-box; }
         .inventory-slot:hover, .hotbar-menu-slot:hover { border-color: #ddd; background-color: rgba(255, 255, 255, 0.15); }
         .inventory-slot.selected-for-move, .hotbar-menu-slot.selected-for-move { border-color: yellow; box-shadow: 0 0 5px yellow; }
-
-        /* Style for item icon/count inside slots (Shared) */
         .item-icon { width: 35px; height: 35px; border: 1px solid rgba(0,0,0,0.3); border-radius: 3px; pointer-events: none; }
         .item-count { position: absolute; bottom: 2px; right: 4px; color: white; font-size: 0.8em; font-weight: bold; text-shadow: 1px 1px 2px black; pointer-events: none; }
-
-         /* Recipe Area ('E' Menu & Workbench) */
         #recipeSection, #workbenchContext { background: none; padding: 0; flex-grow: 1; display: flex; flex-direction: column; min-height: 150px; }
-         #recipeList, #workbenchRecipeList { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; background-color: rgba(0,0,0,0.15); border-radius: 3px; padding: 5px; }
-        /* Shared recipe item styles */
+        #recipeList, #workbenchRecipeList { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex-grow: 1; background-color: rgba(0,0,0,0.15); border-radius: 3px; padding: 5px; }
         #recipeList li, #workbenchRecipeList li { background-color: rgba(255, 255, 255, 0.08); padding: 8px 12px; margin-bottom: 5px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-         /* Shared button styles */
         #recipeList li button, #workbenchRecipeList li button { padding: 5px 10px; cursor: pointer; background-color: #4CAF50; border: none; color: white; border-radius: 3px; margin-left: auto; flex-shrink: 0; }
         #recipeList li button:disabled, #workbenchRecipeList li button:disabled { background-color: #a0a0a0; cursor: not-allowed; }
-         /* Shared details/ingredients styles */
         .recipe-details { font-size: 0.9em; color: #c0c0c0; width: 100%; margin-top: 4px; }
         .ingredient { margin-right: 8px; white-space: nowrap; }
         .ingredient.missing { color: #ff8080; }
-
-        /* --- Upgrader Specific Styles --- */
-         #upgraderContext h3 { margin-bottom: 20px;}
-         .upgrader-slots { display: flex; justify-content: space-around; align-items: center; margin-bottom: 20px; background-color: rgba(0,0,0,0.2); padding: 15px; border-radius: 5px; }
-         .upgrader-slot-area { text-align: center; font-size: 0.9em; color: #ccc;}
-         .upgrader-slot-area .inventory-slot { margin: 5px auto; cursor: default; border-color: #555; }
-         .upgrader-input-slot { cursor: pointer; border-color: #88f; } /* Make input clickable */
-         .upgrader-input-slot:hover { border-color: #aaf; }
-         .upgrader-input-slot.has-item, .upgrader-material-slot.has-item, .upgrader-output-slot.has-item { opacity: 1; } /* Show items clearly */
-         .upgrader-material-slot .item-icon { width: 25px; height: 25px; }
-         .upgrader-plus, .upgrader-arrow { font-size: 1.5em; margin: 0 10px; }
-         #upgradeItemButton { display: block; width: 120px; padding: 10px; margin: 15px auto; font-size: 1em; cursor: pointer; background-color: #6a4caf; border: none; color: white; border-radius: 5px; }
-         #upgradeItemButton:disabled { background-color: #777; cursor: not-allowed; }
-
-        /* Close Button Styling */
+        #upgraderContext h3 { margin-bottom: 20px;}
+        .upgrader-slots { display: flex; justify-content: space-around; align-items: center; margin-bottom: 20px; background-color: rgba(0,0,0,0.2); padding: 15px; border-radius: 5px; }
+        .upgrader-slot-area { text-align: center; font-size: 0.9em; color: #ccc;}
+        .upgrader-slot-area .inventory-slot { margin: 5px auto; cursor: default; border-color: #555; }
+        .upgrader-input-slot { cursor: pointer; border-color: #88f; }
+        .upgrader-input-slot:hover { border-color: #aaf; }
+        .upgrader-input-slot.has-item, .upgrader-material-slot.has-item, .upgrader-output-slot.has-item { opacity: 1; }
+        .upgrader-material-slot .item-icon { width: 25px; height: 25px; }
+        .upgrader-plus, .upgrader-arrow { font-size: 1.5em; margin: 0 10px; }
+        #upgradeItemButton { display: block; width: 120px; padding: 10px; margin: 15px auto; font-size: 1em; cursor: pointer; background-color: #6a4caf; border: none; color: white; border-radius: 5px; }
+        #upgradeItemButton:disabled { background-color: #777; cursor: not-allowed; }
         #closeCraftingButton { position: absolute; top: 10px; right: 10px; padding: 5px 8px; background-color: #f44336; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 0.9em; z-index: 55; }
 
-        /* --- START Class Selection Overlay Styles --- */
-        #classSelectionOverlay {
-            position: fixed; /* Covers the whole screen */
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.85); /* Dark overlay */
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 100; /* Above everything else initially */
-            color: white;
-            font-family: sans-serif;
-            text-align: center;
+        /* --- Class Selection Overlay Styles --- */
+        #classSelectionOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.85); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; color: white; font-family: sans-serif; text-align: center; }
+        #classSelectionOverlay h2 { margin-bottom: 20px; }
+        #classSelectionOverlay label { margin-right: 10px; font-size: 1.1em; }
+        #classSelect { padding: 8px 12px; font-size: 1em; border-radius: 5px; margin-bottom: 30px; min-width: 150px; }
+        #startGameButton { padding: 12px 25px; font-size: 1.2em; cursor: pointer; background-color: #4CAF50; border: none; color: white; border-radius: 5px; transition: background-color 0.2s; }
+        #startGameButton:disabled { background-color: #a0a0a0; cursor: not-allowed; }
+        #startGameButton:enabled:hover { background-color: #45a049; }
+
+        /* --- Level Perk & Weapon/Pet Choice Overlay Styles --- */
+        #levelPerkOverlay, #weaponChoiceOverlay, #petChoiceOverlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 30, 0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 110; color: white; font-family: sans-serif; text-align: center; padding: 20px; box-sizing: border-box;
         }
-        #classSelectionOverlay h2 {
-            margin-bottom: 20px;
-        }
-        #classSelectionOverlay label {
-            margin-right: 10px;
-            font-size: 1.1em;
-        }
-        #classSelect {
-            padding: 8px 12px;
-            font-size: 1em;
-            border-radius: 5px;
-            margin-bottom: 30px;
-            min-width: 150px;
-        }
-        #startGameButton {
-            padding: 12px 25px;
-            font-size: 1.2em;
-            cursor: pointer;
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            border-radius: 5px;
-            transition: background-color 0.2s;
-        }
-        #startGameButton:disabled {
-            background-color: #a0a0a0;
-            cursor: not-allowed;
-        }
-        #startGameButton:enabled:hover {
-             background-color: #45a049;
-        }
-        /* --- END Class Selection Overlay Styles --- */
+        #levelPerkOverlay h2, #weaponChoiceOverlay h2, #petChoiceOverlay h2 { margin-bottom: 25px; color: #FFD700; }
+        #levelPerkOverlay p, #weaponChoiceOverlay p, #petChoiceOverlay p { margin-bottom: 30px; max-width: 500px; line-height: 1.5; color: #eee; }
+        .perk-choices, .weapon-choices, .pet-choices { display: flex; flex-wrap: wrap; /* Allow wrapping for pets */ justify-content: center; /* Center buttons */ gap: 20px; }
+        #levelPerkOverlay button, #weaponChoiceOverlay button, #petChoiceOverlay button { padding: 15px 30px; font-size: 1.1em; cursor: pointer; background-color: #4a6f4b; border: 2px solid #8fbc8f; color: white; border-radius: 5px; transition: background-color 0.2s, transform 0.1s; min-width: 180px; margin: 5px; /* Add margin for wrap spacing */ }
+        #levelPerkOverlay button:hover, #weaponChoiceOverlay button:hover, #petChoiceOverlay button:hover { background-color: #5a8f5b; border-color: #aFccaF; transform: translateY(-2px); }
+         /* Specific styles for weapon choice details */
+         .weapon-choice { border: 1px solid #ccc; padding: 15px; border-radius: 8px; background: rgba(255,255,255,0.1); max-width: 300px; }
+         .weapon-choice h3 { margin-top: 0; color: #FFD700; }
+         .weapon-choice p { margin-bottom: 15px; font-size: 0.95em; }
 
     </style>
 </head>
@@ -334,6 +280,7 @@
             <div class="hotbar-slot" id="hotbar-slot-3">4</div>
             <div class="hotbar-slot" id="hotbar-slot-4">5</div>
         </div>
+         <div id="minionInfoBar"></div> <!-- Minion Info Bar -->
         <div id="debug">World: (0, 0) | Mouse: (0, 0) | Res: 0 | Mon: 0 | Items: 0</div>
         <div id="deathMessage">YOU DIED<br><small>(Refresh to restart)</small></div>
     </div> <!-- End of gameContainer -->
@@ -383,6 +330,46 @@
         </div>
         <button id="closeCraftingButton">Close [E/ESC]</button>
     </div>
+
+    <!-- Level 3 Perk Selection Overlay -->
+    <div id="levelPerkOverlay">
+        <h2>Level 3 Reached! Choose a Perk:</h2>
+        <p id="perkDescription"></p>
+        <div class="perk-choices">
+            <button id="perkChoice1Button" data-choice-index="1">Choice 1</button>
+            <button id="perkChoice2Button" data-choice-index="2">Choice 2</button>
+        </div>
+    </div>
+
+     <!-- Weapon Choice Overlay -->
+     <div id="weaponChoiceOverlay" style="display: none;">
+         <h2 id="weaponChoiceTitle">Mystical Choice</h2>
+         <div class="weapon-choices">
+             <div class="weapon-choice">
+                  <h3 id="weapon1Name">Weapon 1</h3>
+                  <p id="weapon1Desc">Description 1</p>
+                  <button id="weaponChoice1Button" data-weapon-id="">Choose</button>
+             </div>
+             <div class="weapon-choice">
+                  <h3 id="weapon2Name">Weapon 2</h3>
+                  <p id="weapon2Desc">Description 2</p>
+                  <button id="weaponChoice2Button" data-weapon-id="">Choose</button>
+             </div>
+         </div>
+     </div>
+
+     <!-- Pet Choice Overlay -->
+     <div id="petChoiceOverlay" style="display: none;">
+        <h2>Level 5 Reached! Choose Your Companion:</h2>
+        <div class="pet-choices">
+            <button id="petChoice1Button" data-pet-type="frog">Frog</button>
+            <button id="petChoice2Button" data-pet-type="cat">Cat</button>
+            <button id="petChoice3Button" data-pet-type="beetle">Beetle</button>
+            <button id="petChoice4Button" data-pet-type="bird">Bird</button>
+            <button id="petChoice5Button" data-pet-type="dog">Dog</button>
+        </div>
+    </div>
+
 
     <!-- Load Game Script -->
     <script src="game.js"></script>
