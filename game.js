@@ -401,6 +401,44 @@ function pickNewForestCornerTarget(wolf) {
     console.log(`Wolf ${wolf.id} targeting new corner: (${Math.round(wolf.targetCorner.x)}, ${Math.round(wolf.targetCorner.y)})`); wolf.lastCornerChangeTime = Date.now();
 }
 
+
+// --- UI Update Function --- (MOVED EARLIER)
+function updateUI() {
+    healthValueSpan.textContent = Math.floor(player.health);
+    maxHealthValueSpan.textContent = Math.floor(player.maxHealth);
+    hungerValueSpan.textContent = Math.floor(player.hunger);
+    dayValueSpan.textContent = dayCount;
+    levelValueSpan.textContent = player.level;
+    xpValueSpan.textContent = `${player.currentXP}/${player.xpToNextLevel}`;
+
+    if (gameHasStarted && minionInfoBar) {
+        if (player.className === 'necromancer') {
+            minionInfoBar.style.display = 'block';
+            const killsNeeded = CLASS_DATA.necromancer.killsToSummon;
+            const killsProgress = player.monsterKillCount % killsNeeded;
+            minionInfoBar.textContent = `Undead: ${undeadMinions.length}/${MAX_UNDEAD_MINIONS} | Kills: ${killsProgress}/${killsNeeded}`;
+        } else if (player.className === 'summoner') {
+            minionInfoBar.style.display = 'block';
+            const currentMaxSlimes = MAX_SUMMONED_SLIMES + player.bonusMaxSummons;
+            minionInfoBar.textContent = `Slimes: ${summonedSlimes.length}/${currentMaxSlimes}`;
+        } else {
+            minionInfoBar.style.display = 'none';
+        }
+    } else if (minionInfoBar) {
+        minionInfoBar.style.display = 'none';
+    }
+
+    let debugSpeedPenalty = (!isNight && player.daySpeedPenalty < 1.0) ? ` DayPen:x${player.daySpeedPenalty.toFixed(2)}` : '';
+    let nightSpeedBonus = (isNight && player.bonusNightSpeedMult > 1.0) ? ` NightSpd:x${player.bonusNightSpeedMult.toFixed(2)}` : '';
+    let necroKills = player.className === 'necromancer' ? ` NKills:${player.monsterKillCount}` : '';
+    let currentSpeed = PLAYER_SPEED * player.speedMultiplier * player.bonusMovementSpeedMult * player.weaponMoveSpeedMult;
+    if (!isNight && player.daySpeedPenalty < 1.0) currentSpeed *= player.daySpeedPenalty;
+    if (isNight && player.bonusNightSpeedMult > 1.0) currentSpeed *= player.bonusNightSpeedMult;
+
+    debugDiv.textContent = `World:(${Math.round(player.x)},${Math.round(player.y)})|Mouse:(${Math.round(worldMouseX)},${Math.round(worldMouseY)})|Res:${resources.length}|Mon:${monsters.length}|Undead:${undeadMinions.length}|Summon:${summonedSlimes.length}|Boss:${bosses.length}|Items:${droppedItems.length}|Proj:${projectiles.length}|Speed:${currentSpeed.toFixed(1)}${debugSpeedPenalty}${nightSpeedBonus}${necroKills}`;
+}
+
+
 // --- XP and Leveling & Perk Functions ---
 function calculateXPForNextLevel(currentLevel) { if (currentLevel < 1) return BASE_XP_FOR_LEVEL_2; const required = Math.floor(BASE_XP_FOR_LEVEL_2 * Math.pow(currentLevel, XP_LEVEL_EXPONENT)); return Math.max(BASE_XP_FOR_LEVEL_2, required); }
 function gainXP(amount) { if (isGameOver || amount <= 0 || !gameHasStarted) return; player.currentXP += amount; console.log(`%cGained ${amount} XP! Current: ${player.currentXP}/${player.xpToNextLevel}`, "color: lightgreen;"); let leveledUp = false; while (player.currentXP >= player.xpToNextLevel) { leveledUp = true; player.level++; player.currentXP -= player.xpToNextLevel; player.xpToNextLevel = calculateXPForNextLevel(player.level); console.log(`%cLEVEL UP! Reached Level ${player.level}!`, "color: yellow; font-size: 1.2em; font-weight: bold;"); console.log(`%cNext level requires ${player.xpToNextLevel} XP. Current XP: ${player.currentXP}`, "color: lightblue;"); } if (leveledUp && player.level === 3 && !player.hasChosenLevel3Perk) { showLevel3PerkMenu(); } if (leveledUp && player.level === 5 && !player.pet) { showPetChoiceMenu(); } updateUI(); }
@@ -410,7 +448,8 @@ function showLevel3PerkMenu() { // Ensure elements exist
     perkChoice1Button = newChoice1Button; perkChoice2Button = newChoice2Button; perkChoice1Button.addEventListener('click', () => applyPerkChoice(1), { once: true }); perkChoice2Button.addEventListener('click', () => applyPerkChoice(2), { once: true }); overlay.style.display = 'flex'; }
 function applyPerkChoice(choiceIndex) { if (player.hasChosenLevel3Perk || !gameHasStarted) return; console.log(`Applying Perk Choice ${choiceIndex} for class ${player.className}`); let bonusHealthApplied = 0; switch (player.className) { case 'knight': if (choiceIndex === 1) { player.bonusMaxHealth += 20; bonusHealthApplied = 20;} else { player.bonusSwordDamage += 15; } break; case 'archer': if (choiceIndex === 1) { player.bonusMovementSpeedMult *= 1.10; } else { player.bonusBowAttackSpeedMult *= 0.90; } break; case 'scout': if (choiceIndex === 1) { player.bonusMaxHealth += 10; bonusHealthApplied = 10;} else { player.bonusMeleeDamage += 15; } break; case 'tank': if (choiceIndex === 1) { player.bonusMaxHealth += 50; bonusHealthApplied = 50;} else { player.bonusMeleeDamage += 20; player.bonusMovementSpeedMult *= 0.85; } break; case 'vampire': if (choiceIndex === 1) { player.bonusLifesteal += 2.5; } else { player.bonusMovementSpeedMult *= 1.15; } break; case 'necromancer': if (choiceIndex === 1) { CLASS_DATA.necromancer.killsToSummon = Math.max(1, (CLASS_DATA.necromancer.killsToSummon || NECROMANCER_KILLS_TO_SUMMON) -1); console.log("Necromancer kills needed reduced to:", CLASS_DATA.necromancer.killsToSummon);} else { player.bonusUndeadHealthMult *= 1.20; } break; case 'summoner': if (choiceIndex === 1) { player.bonusMaxSummons += 1; } else { player.bonusSummonHealthMult *= 1.25; } break; } player.hasChosenLevel3Perk = true; levelPerkOverlay.style.display = 'none'; gamePaused = false; // Apply accumulated health bonus
     player.maxHealth += player.bonusMaxHealth; player.health += player.bonusMaxHealth; player.bonusMaxHealth = 0; // Reset accumulator
-    updateUI(); console.log("Perk applied. Player stats updated."); }
+    updateUI(); // <<< Call updateUI here
+    console.log("Perk applied. Player stats updated."); }
 
 // --- Weapon Choice Functions ---
 function showWeaponChoiceMenu() { // Ensure elements exist
@@ -418,7 +457,8 @@ function showWeaponChoiceMenu() { // Ensure elements exist
     const newWeapon1Button = button1.cloneNode(true); const newWeapon2Button = button2.cloneNode(true); button1.parentNode.replaceChild(newWeapon1Button, button1); button2.parentNode.replaceChild(newWeapon2Button, button2); weaponChoice1Button = newWeapon1Button; // Update global refs
     weaponChoice2Button = newWeapon2Button; weaponChoice1Button.addEventListener('click', handleWeaponChoice, { once: true }); weaponChoice2Button.addEventListener('click', handleWeaponChoice, { once: true }); overlay.style.display = 'flex'; }
 function handleWeaponChoice(event) { const chosenWeaponId = event.target.dataset.weaponId; console.log("Weapon chosen:", chosenWeaponId); let chosenWeaponData = null; for (const classKey in CLASS_WEAPON_CHOICES) { const weapon = CLASS_WEAPON_CHOICES[classKey].find(w => w.id === chosenWeaponId); if (weapon) { chosenWeaponData = weapon; break; } } if (chosenWeaponData) { applyWeaponEffects(chosenWeaponData); player.chosenWeaponId = chosenWeaponId; // Find and remove the orb AFTER applying effects
-        const orbInvIndex = player.inventorySlots.findIndex(slot => slot && slot.type === 'mystical_orb'); if (orbInvIndex !== -1) { removeFromInventory('mystical_orb', 1); } else { const orbHotbarIndex = player.hotbarSlots.findIndex(slot => slot && slot.type === 'mystical_orb'); if (orbHotbarIndex !== -1) { decrementHotbarItem(orbHotbarIndex); } else { console.warn("Mystical Orb not found after choosing weapon?"); } } } else { console.error("Could not find chosen weapon data for ID:", chosenWeaponId); } weaponChoiceOverlay.style.display = 'none'; gamePaused = false; updateUI(); }
+        const orbInvIndex = player.inventorySlots.findIndex(slot => slot && slot.type === 'mystical_orb'); if (orbInvIndex !== -1) { removeFromInventory('mystical_orb', 1); } else { const orbHotbarIndex = player.hotbarSlots.findIndex(slot => slot && slot.type === 'mystical_orb'); if (orbHotbarIndex !== -1) { decrementHotbarItem(orbHotbarIndex); } else { console.warn("Mystical Orb not found after choosing weapon?"); } } } else { console.error("Could not find chosen weapon data for ID:", chosenWeaponId); } weaponChoiceOverlay.style.display = 'none'; gamePaused = false; updateUI(); // <<< Call updateUI here
+}
 function applyWeaponEffects(weaponData) { console.log("Applying effects for:", weaponData.name); // Reset temporary multipliers first
     player.weaponAttackSpeedMult = 1.0; player.weaponDamageMult = 1.0; player.weaponMoveSpeedMult = 1.0; player.weaponRangeMult = 1.0; player.weaponOnKillHeal = 0; // Apply new ones
     for (const effect in weaponData.effects) { console.log(` - Applying ${effect}: ${weaponData.effects[effect]}`); switch (effect) { case 'weaponDamageMult': player.weaponDamageMult *= weaponData.effects[effect]; break; case 'weaponAttackSpeedMult': player.weaponAttackSpeedMult *= weaponData.effects[effect]; break; case 'weaponMoveSpeedMult': player.bonusMovementSpeedMult *= weaponData.effects[effect]; break; // Applies to bonusMovementSpeedMult
@@ -507,7 +547,6 @@ function handleUpgraderInputClick() { const selected = player.selectedInventoryI
 function doUpgrade() { if(!selectedUpgradeInput.itemData){console.warn("No tool selected to upgrade.");return;} const toolToUpgradeType = selectedUpgradeInput.itemData.type; const upgradeRecipe=UPGRADER_RECIPES[toolToUpgradeType]; if(!upgradeRecipe){console.error("Upgrade recipe inconsistency for type:", toolToUpgradeType);return;} if(getTotalItemCount(upgradeRecipe.material)>=upgradeRecipe.materialCount){const removedMat=removeFromInventory(upgradeRecipe.material,upgradeRecipe.materialCount); // Tool is already conceptually removed from player inv/hotbar by handleUpgraderInputClick
         if(removedMat){addToInventory(upgradeRecipe.output,1);console.log(`%cUpgraded to ${ITEM_DATA[upgradeRecipe.output]?.name || upgradeRecipe.output}!`, "color: lightblue; font-weight: bold;");selectedUpgradeInput={slotIndex:-1,source:null, itemData: null}; // Clear state
             populateCraftingMenu(false,true);updateMainHotbarVisuals();updateEquippedItem();}else{console.error("Failed to remove materials during upgrade attempt."); // Attempt to refund materials if tool removal failed? Tool already removed conceptually.
-             // Just clear the state, the tool is "lost" in the failed attempt for simplicity now
              // --- FIX START ---
              if (!removedMat && selectedUpgradeInput.itemData) { // Tool was conceptually removed, but mats failed. Refund tool?
                  console.warn("Trying to return tool after failed mat removal...");
@@ -582,7 +621,7 @@ canvas.addEventListener('mousedown', (event) => { if(isGameOver||isCraftingMenuO
 canvas.addEventListener('mouseup', (event) => { if (event.button === 0) { isMouseDown = false; } });
 canvas.addEventListener('mouseleave', () => { isMouseDown = false; });
 closeCraftingButton.addEventListener('click', ()=>{if(player.selectedInventoryItem){player.selectedInventoryItem=null;} if(selectedUpgradeInput.itemData)selectedUpgradeInput={slotIndex:-1,source:null, itemData: null}; toggleCraftingMenu();});
-// Removed duplicate crafting menu click listener
+
 
 // --- Action Functions ---
 function findNearestObject(x, y, rangeSq, filterFn = () => true) { let closest=null,minDistSq=rangeSq; // Check placed resources first
@@ -626,6 +665,9 @@ function tryInteract() { if (!gameHasStarted || gamePaused) return; const item =
 function selectHotbar(index) { if(index<0||index>=HOTBAR_SIZE)return; player.selectedHotbarSlotIndex=index; mainHotbarSlots.forEach((slot,i)=>{slot.classList.toggle('selected',i===index);}); updateEquippedItem(); }
 function updateEquippedItem() { const slot=player.hotbarSlots[player.selectedHotbarSlotIndex]; player.equippedItemType=slot?slot.type:null; }
 
+// --- Update Functions --- (applyDamageToPlayer is defined earlier now)
+// All other update functions (updatePlayer, updateMonsters, etc.) are defined further down
+
 // --- Summoner Ability Functions ---
 function trySummonSlime() { if (!gameHasStarted || gamePaused || player.className !== 'summoner') return; const currentMaxSlimes = MAX_SUMMONED_SLIMES + player.bonusMaxSummons; if (summonedSlimes.length >= currentMaxSlimes) { console.log("Max summoned slimes reached. Removing oldest..."); summonedSlimes.shift(); // Remove the first (oldest) slime
      } console.log("Attempting to summon slime..."); const spawnDist = player.radius + SUMMONED_SLIME_RADIUS + 5; const spawnX = player.x + Math.cos(player.angle) * spawnDist; const spawnY = player.y + Math.sin(player.angle) * spawnDist; spawnSummonedSlime(spawnX, spawnY); }
@@ -659,6 +701,26 @@ function initializeGame() { console.log("--- Initializing Game World ---"); // R
 // --- Event Listeners for Class Selection ---
 classSelect.addEventListener('change', ()=>{startGameButton.disabled=!(classSelect.value&&CLASS_DATA[classSelect.value]);});
 startGameButton.addEventListener('click', ()=>{const selectedClass=classSelect.value; if(!selectedClass||!CLASS_DATA[selectedClass]){alert("Select class!");return;} applyClassStats(selectedClass); classSelectionOverlay.style.display='none'; initializeGame();});
+
+
+// --- Main Update Function ---
+function update(deltaTime) { if (isGameOver || !gameHasStarted || gamePaused) return; if (!deltaTime || deltaTime <= 0 || deltaTime > 500) deltaTime = FRAME_TIME_TARGET; // Use target frame time if deltaTime is invalid
+     // Handle Attack Input
+     if(isMouseDown && !player.isInteracting && !isCraftingMenuOpen) { if(player.equippedItemType && ITEM_DATA[player.equippedItemType]?.toolType !== 'bow') { // Melee hold logic handled in tryAttack cooldown check
+            tryAttack(); } else if (player.equippedItemType && ITEM_DATA[player.equippedItemType]?.toolType === 'bow') { // Bow hold logic (fires on cooldown)
+            tryAttack(); } } else { // Stop melee attack animation if mouse released and duration passed
+        if(player.equippedItemType && ITEM_DATA[player.equippedItemType]?.toolType !== 'bow' && player.isAttacking && Date.now() - player.attackTimer > ATTACK_DURATION) { player.isAttacking = false; } } // Update Entities
+    updatePlayer(deltaTime); updateMonsters(deltaTime); updateBosses(deltaTime); updateUndeadMinions(deltaTime); updateSummonedSlimes(deltaTime); updatePets(deltaTime); updateProjectiles(deltaTime); updateWorld(deltaTime); clampCamera(); updateUI(); }
+
+// --- Main Draw Function ---
+function draw() { if(!gameHasStarted){ctx.clearRect(0,0,canvas.width,canvas.height);return;} ctx.clearRect(0,0,canvas.width,canvas.height);ctx.save();ctx.translate(canvas.width/2-cameraX,canvas.height/2-cameraY); drawWorldBackground();drawBiomeWalls();drawResources();drawMonsters();drawBosses();drawUndeadMinions();drawSummonedSlimes();drawDroppedItems();drawProjectiles();drawPlayer();drawPets(); // Draw Night Overlay & Lights
+     if(currentNightOpacity>0.01){ctx.save();ctx.fillStyle='#00001a';ctx.globalAlpha=currentNightOpacity;ctx.fillRect(cameraX-canvas.width/2,cameraY-canvas.height/2,canvas.width,canvas.height);ctx.globalAlpha=1.0;ctx.globalCompositeOperation='lighter'; // Lights add brightness
+        // Draw Torch Lights
+        resources.forEach(res=>{if(res.isPlaced&&res.lightRadius>0&&res.type==='torch'){const g=ctx.createRadialGradient(res.x,res.y,0,res.x,res.y,res.lightRadius),b=0.6;g.addColorStop(0,`rgba(255,190,120,${b})`);g.addColorStop(0.6,`rgba(200,100,50,${b*0.5})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(res.x,res.y,res.lightRadius,0,Math.PI*2);ctx.fill();}}); // Draw Lava Pool Lights
+        lavaPools.forEach(p=>{if(p.lightRadius>0){const cX=p.x+p.width/2,cY=p.y+p.height/2,b=p.lightOpacity||0.8,g=ctx.createRadialGradient(cX,cY,0,cX,cY,p.lightRadius);g.addColorStop(0,`rgba(255,100,0,${b*0.9})`);g.addColorStop(0.5,`rgba(255,60,0,${b*0.6})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(cX,cY,p.lightRadius,0,Math.PI*2);ctx.fill();}}); // Draw Player Held Torch Light
+        if(player.equippedItemType==='torch'){const d=ITEM_DATA['torch'];if(d&&d.lightRadius>0){const r=d.lightRadius,g=ctx.createRadialGradient(player.x,player.y,0,player.x,player.y,r),b=0.65;g.addColorStop(0,`rgba(255,190,120,${b})`);g.addColorStop(0.6,`rgba(200,100,50,${b*0.5})`);g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(player.x,player.y,r,0,Math.PI*2);ctx.fill();}}ctx.restore();} ctx.restore(); // Restore camera translation
+    drawMinimap(ctx); // Draw minimap on top (not affected by camera or night)
+}
 
 // --- Game Loop ---
 let lastTime = 0;
