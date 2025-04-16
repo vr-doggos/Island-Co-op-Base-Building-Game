@@ -718,7 +718,7 @@ function updatePets(deltaTime) { if (!player.pet || gamePaused) return; const no
 function drawPets() { if (!player.pet || gamePaused) return; const pet = player.pet; const now = Date.now(); ctx.save(); ctx.translate(pet.x, pet.y); ctx.fillStyle = (pet.flashUntil > now && Math.floor(now / 50) % 2 === 0) ? '#FFF' : pet.color; ctx.strokeStyle = 'black'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(0, 0, pet.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); ctx.fillStyle = 'black'; if (pet.type === 'frog' || pet.type === 'cat' || pet.type === 'dog') { ctx.beginPath(); ctx.arc(-pet.radius * 0.4, -pet.radius * 0.2, 2, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(pet.radius * 0.4, -pet.radius * 0.2, 2, 0, Math.PI * 2); ctx.fill(); } else if (pet.type === 'beetle') { ctx.beginPath(); ctx.moveTo(0, -pet.radius); ctx.lineTo(-3, -pet.radius - 4); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, -pet.radius); ctx.lineTo(3, -pet.radius - 4); ctx.stroke(); if(!pet.blockReady){ ctx.fillStyle = 'rgba(100, 100, 100, 0.4)'; ctx.beginPath(); ctx.arc(0, 0, pet.radius+1, 0, Math.PI * 2); ctx.fill(); } } else if (pet.type === 'bird') { ctx.fillStyle = '#FFD700'; ctx.beginPath(); ctx.moveTo(0, -pet.radius * 0.5); ctx.lineTo(pet.radius, 0); ctx.lineTo(0, pet.radius * 0.5); ctx.closePath(); ctx.fill(); } ctx.restore(); }
 
 // --- Game Loop ---
-let lastTime = 0;
+let lastTime = 0; 
 function gameLoop(timestamp) { const deltaTime=timestamp-lastTime; lastTime=timestamp; if (!isGameOver && gameHasStarted) { update(deltaTime || 0); } draw(); requestAnimationFrame(gameLoop); }
 
 // --- Apply Class Stats Function ---
