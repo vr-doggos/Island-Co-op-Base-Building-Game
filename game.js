@@ -1706,8 +1706,11 @@ function updatePlayer(deltaTime) {
     let speed=C.PLAYER_SPEED*player.speedMultiplier*player.bonusMovementSpeedMult*player.weaponMoveSpeedMult;
     if(!isNight&&player.daySpeedPenalty<1.0){speed*=player.daySpeedPenalty*player.bonusDaySpeedPenaltyMult;} // Apply penalty multiplier
     if(isNight&&player.bonusNightSpeedMult>1.0){speed*=player.bonusNightSpeedMult;}
-    if(mag>0){finalDx=(dx/mag)*speed; finalDy=(dy/mag)*speed;} else {finalDx=0; finalDy=0;}
-    let potentialX = player.x + finalDx; let potentialY = player.y + finalDy;
+    let finalDx = 0;
+    let finalDy = 0;
+    if(mag>0){finalDx=(dx/mag)*speed; finalDy=(dy/mag)*speed;} 
+    let potentialX = player.x + finalDx; // Now finalDx is guaranteed to be defined
+    let potentialY = player.y + finalDy;
     const collisionEntities = [...solidObjects, ...monsters, ...bosses, ...undeadMinions, ...summonedSlimes];
     let collidedWith = checkCollision(player.radius, potentialX, potentialY, player.id, collisionEntities);
     if (collidedWith && collidedWith.type === 'forest_wolf') { applyDamageToPlayer(collidedWith.contactDamage, 'Forest Wolf Collision'); collidedWith = true; }
